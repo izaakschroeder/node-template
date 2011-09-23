@@ -1,0 +1,11 @@
+{
+	"name": "template",
+	"version": "0.0.1",
+	"description": "A simple templating engine capable of working both in and out of browser.",
+	"author": "Izaak Schroeder",
+	"engine": "node >= 0.4.10",
+	"main": "template.js",
+	"dependencies": {
+		"dom": "0.0.1"
+	}
+}

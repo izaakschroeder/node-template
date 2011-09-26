@@ -1,130 +1,208 @@
-(function(t) {
+(function(exports) {
 
-var fs = require('fs');
-var DOM = require('dom');
-var sizzle = require('sizzle');
-var cache = {};
-var util = require('util');
+global.sizzleCapabilities = {
+	contains: true,
+	compareDocumentPosition: false,
+	nodeListToArray: true,
+	querySelectorAll: false,
+	getElementsByClassName: false,
+	getElementByIdWithName: false,
+	getElementsByTagNameIncludesComments: false,
+	normalizedHrefAttributes: false,
+	matchesSelector: false
+}
 
-var querySelector = sizzle.query;
-var searchPath = "./templates";
+var EventEmitter = require('events').EventEmitter;
 
-function execute(name, _dom, bindings, data, done) {
+/**
+ *
+ *
+ *
+ */
+function Engine(opts) {
+	this.provider = opts.provider;
+	this.querySelector = opts.querySelector;
+	this.cache = { };
+}
+
+/**
+ *
+ *
+ *
+ */
+Engine.prototype.execute = function(name, _dom, bindings, data, done) {
 	var dom = _dom;
-	//var dom = Object.clone(_dom);
-	for(var selector in bindings) {
-		var key = bindings[selector];
-		var xxx = undefined;
+	var querySelector = this.querySelector;	
 	
-		if (typeof key === "function")
-			xxx = key.call(key, data);
-		else
-			xxx = data[key];
+	function update(element, replacement) {
+		if (typeof replacement === "function")
+			replacement = replacement.call(replacement, data, element);
+			
 		
-		var elements = querySelector(selector, dom);
-		/*
-		if (typeof xxx.length !== "undefined" && typeof xxx.splice === "function") {			
-			for (var i in elements) {
-				replacements = [];
-				for (var j = 0; j<data[key].length; ++j) {
-					var newNode = elements[i].clone();
-					newNode.content(data[key][j]);
+		if (typeof replacement === "undefined") {
+			element.remove();
+			return null;
+		}
+		else if (replacement === null) {
+			element.empty();
+			return element;
+		}
+		else if (typeof replacement.length !== "undefined" && typeof replacement.splice === "function") {
+			var newNode, replacements = [];
+			for (var j = 0; j<replacement.length; ++j)
+				if (newNode = update(element.cloneNode(true), replacement[j]))
 					replacements.push(newNode);
-				}
-				elements[i].replace(replacements);
-			}
-		} */
-		//else {
-			for (var i in elements)
-				elements[i].content(xxx);
-		//}
-		
+			element.replace(replacements);
+			return element;
+		}
+		else {
+			element.content(replacement);
+			return element;
+		}
 	}
-	//dom.firstChild.attributes["data-template"] = name;
+	
+	function transform(element, bindings, data) {
+		
+		for (var selector in bindings) {
+						
+			var 
+				elements = querySelector(selector, element),
+				key = bindings[selector];
+				
+			 if (typeof data.length !== "undefined" && typeof data.splice === "function") {
+			 	var newNode, replacements = [];
+				for (var j = 0; j<data.length; ++j)
+					if (newNode = transform(element.cloneNode(true), bindings, data[j]))
+						replacements.push(newNode);
+				element.replace(replacements);
+			 }
+			 else {
+			 	if (typeof key === "function") {
+					var value = key.call(key, data);
+					for (var i=0; i<elements.length; ++i) 
+						update(elements[i], value);
+				}
+				else if (typeof key.bindings !== "undefined") {
+					for (var i=0; i<elements.length; ++i) 
+						transform(elements[i], key.bindings, data[key.data]);
+				}
+				else {
+					for (var i=0; i<elements.length; ++i) 
+						update(elements[i], data[key]);
+				}
+			 }
+			
+		}
+		return element;
+
+	}
+		
+		
+	transform(dom, bindings, data);
+	
+	
+	dom.getDocumentElement().attributes["data-template"] = name;
 	done(dom);
 }
 
-var resolve = function(name, done) {
-	done(searchPath+'/'+name+'.html');
+/**
+ *
+ *
+ *
+ */
+Engine.Parser = function(callback) {
+	this.buffer = "";
+	this.callback = callback;
+	if (typeof DOMParser !== "undefined") 
+		this.parser = new DOMParser();
+	else
+		this.parser =  require('dom').parser(callback);
 }
 
-var get = function(name, done) {
-	resolve(name, function(path){
-		fs.readFile(path, 'utf8', function(err, content) {
-			if (err)
-				throw err;
-			done({
-				data: content,
-				name: name
-			});
-		});
-	});
+/**
+ *
+ *
+ *
+ */
+Engine.Parser.prototype.data = function(data) {
+	if (typeof this.parser.data === "function")
+		this.parser.data(data);
+	else if (typeof this.parser.parseFromString === "function")
+		this.buffer += data;
 }
 
+/**
+ *
+ *
+ *
+ */
+Engine.Parser.prototype.end = function() {
+	if (typeof this.parser.end === "function")
+		this.parser.end();
+	else if (typeof this.parser.parseFromString === "function")
+		this.callback(this.parser.parseFromString(this.buffer, "text/xml"));
+		
+}
 
-
-var template = function(name, bindings, data, done) {
-	var file = searchPath+'/'+name+'.html';
-	var cachedTemplate = cache[name];
-	
-	if (cachedTemplate)
-		fs.stat(file, function(err, stats) {
-			if (err || stats.mtime > cache[name].mtime)
-				cache[name].outdated = true;
+/**
+ *
+ *
+ *
+ */
+Engine.prototype.template = function(name, bindings, data, done) {
+	var engine = this, cachedTemplate = this.cache[name];
+		
+	if ( cachedTemplate )
+		engine.provider.lastModified(name, function(time) {
+			cachedTemplate[name].outdated = !time || time > cachedTemplate[name].mtime;
 		});
 	
-	if (cachedTemplate && !cachedTemplate.outdated ) {
-		execute(name, cachedTemplate.dom, bindings, data, done);
-		return;
-	}
+	if ( cachedTemplate && !cachedTemplate.outdated )
+		return engine.execute(name, cachedTemplate.dom, bindings, data, done);
 	
-	var p = DOM.parser(function(dom) {
-		cache[name] = {
+	
+	var p = new Engine.Parser(function(dom) {
+		engine.cache[name] = {
 			dom: dom,
 			mtime: Date.now(),
 			outdated: false
 		};
-		execute(name, dom, bindings, data, done);
+		engine.execute(name, dom, bindings, data, done);
 	});
 	
-	fs.createReadStream(file).addListener( "data", function(chunk) {
-		p.data(chunk.toString());
-	}).addListener( "close",function() {
-		p.end();
-	});
-}
-
-var templates = function(done) {
-	out = { };
-	fs.readdir(searchPath, function (err, files) { 
-		if (err) 
-			throw err;
-		var n = files.length;
-		files.forEach( function (file) {
-			
-			var path = searchPath + '/' + file;
-			fs.stat(path, function (err, stat) {
-				if (!err && stat.isFile()) {
-					fs.readFile(path, 'utf8', function(err, content) {
-						var name = file.substr(0, file.lastIndexOf('.')) || file;
-						out[name] = {
-							name: name,
-							data: content,
-							lastModified: stat.mtime
-						}
-						if (--n == 0) {
-							done(out);
-						}
-					})
-				}
+	engine.provider.get(name, function(e) {
+		if ((typeof EventEmitter !== "undefined") && (e instanceof EventEmitter)) {
+			e.on( "data", function(chunk) {
+				p.data(chunk.toString());
+			}).on( "close",function() {
+				p.end();
 			});
-		});
+		}
+		else {
+			p.data(e);
+			p.end();
+		}
 	});
+	
+	return this;
 }
 
-t.execute = template;
-t.all = templates;
-t.get = get;
-t.resolve = resolve;
+/**
+ *
+ *
+ *
+ */
+exports.engine = function(opts) {
+	if (!opts.provider) {
+		var FileSystemProvider = require('template/providers/filesystem');
+		opts.provider = new FileSystemProvider('./templates');
+	}
+	
+	if (!opts.querySelector) {
+		opts.querySelector = require('sizzle').Sizzle
+	}
+	
+	return new Engine(opts);
+};
 
 })(exports || {});

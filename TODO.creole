@@ -1,0 +1,3 @@
+= To Do =
+
+ * Cache the results from selector execution for performance reasons.

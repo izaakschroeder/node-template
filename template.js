@@ -12,7 +12,9 @@ global.sizzleCapabilities = {
 	matchesSelector: false
 }
 
-var EventEmitter = require('events').EventEmitter;
+//Only defined when using node.js.
+//TODO: Is there a better way of detecting this?
+var EventEmitter = typeof process === "object" ? require('events').EventEmitter : undefined;
 
 /**
  *
@@ -30,8 +32,7 @@ function Engine(opts) {
  *
  *
  */
-Engine.prototype.execute = function(name, _dom, bindings, data, done) {
-	var dom = _dom;
+Engine.prototype.execute = function(dom, bindings, data, done) {
 	var querySelector = this.querySelector;	
 	
 	function update(element, replacement) {
@@ -96,12 +97,9 @@ Engine.prototype.execute = function(name, _dom, bindings, data, done) {
 		return element;
 
 	}
-		
-		
+	
 	transform(dom, bindings, data);
 	
-	
-	dom.getDocumentElement().attributes["data-template"] = name;
 	done(dom);
 }
 
@@ -154,11 +152,11 @@ Engine.prototype.template = function(name, bindings, data, done) {
 		
 	if ( cachedTemplate )
 		engine.provider.lastModified(name, function(time) {
-			cachedTemplate[name].outdated = !time || time > cachedTemplate[name].mtime;
+			cachedTemplate.outdated = !time || time > cachedTemplate.mtime;
 		});
 	
 	if ( cachedTemplate && !cachedTemplate.outdated )
-		return engine.execute(name, cachedTemplate.dom, bindings, data, done);
+		return engine.execute(cachedTemplate.dom, bindings, data, done);
 	
 	
 	var p = new Engine.Parser(function(dom) {
@@ -167,7 +165,8 @@ Engine.prototype.template = function(name, bindings, data, done) {
 			mtime: Date.now(),
 			outdated: false
 		};
-		engine.execute(name, dom, bindings, data, done);
+		dom.getDocumentElement().attributes["data-template"] = name;
+		engine.execute(dom, bindings, data, done);
 	});
 	
 	engine.provider.get(name, function(e) {
@@ -193,9 +192,10 @@ Engine.prototype.template = function(name, bindings, data, done) {
  *
  */
 exports.engine = function(opts) {
+	opts = opts || { };
 	if (!opts.provider) {
 		var FileSystemProvider = require('template/providers/filesystem');
-		opts.provider = new FileSystemProvider('./templates');
+		opts.provider = new FileSystemProvider();
 	}
 	
 	if (!opts.querySelector) {

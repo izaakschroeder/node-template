@@ -1,8 +1,18 @@
 
+/**
+ *
+ *
+ *
+ */
 function BrowserProvider(opts) {
 	
 }
 
+/**
+ *
+ *
+ *
+ */
 BrowserProvider.prototype.cache = function(name, value) {
 	var hasLocalStorage = typeof(localStorage) !== 'undefined';
 	if (typeof value === "undefined") {
@@ -24,10 +34,47 @@ BrowserProvider.prototype.cache = function(name, value) {
 	}
 }
 
+/**
+ *
+ *
+ *
+ */
 BrowserProvider.prototype.get = function(name, done) {
+	var request = new XMLHttpRequest();
+	request.open('GET', url);
 	
+	request.onload = function(e) {
+		if (this.status == 200) {
+			//Do something with this!
+			this.getResponseHeader('Last-Modified');
+			done(this.responseText);
+		}
+		else {
+			done(false);
+		}
+	};
+	
+	request.send();
 }
 
+/**
+ *
+ *
+ *
+ */
 BrowserProvider.prototype.lastModified = function(name, done) {
+	var request = new XMLHttpRequest();
+	request.open('HEAD', url);
 	
+	request.onload = function(e) {
+		if (this.status == 200) {
+			//Do something with this!
+			this.getResponseHeader('Last-Modified');
+		}
+		else {
+			done(false);
+		}
+	};
+	
+	request.send();
 }

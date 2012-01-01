@@ -4,7 +4,6 @@ function StaticProvider(opts) {
 	this.lastModified = { };
 	for (var name in this.templates)
 		this.lastModified[name] = Date.now();
-	this.name = "static";
 }
 
 StaticProvider.prototype.set = function(name, value) {

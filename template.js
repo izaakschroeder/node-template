@@ -14,6 +14,7 @@ var
  *
  */
 function Engine(opts) {
+	opts = opts || { };
 	this.provider = opts.provider;
 	this.cache = { };
 	this.log = opts.log || console;

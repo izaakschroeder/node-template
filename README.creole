@@ -1,6 +1,6 @@
 = Template =
 
-https://izaakschroeder.github.com/node-template
+http://izaakschroeder.github.com/node-template
 
 {{{
 

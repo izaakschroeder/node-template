@@ -2,7 +2,11 @@
 
 //Only defined when using node.js.
 //TODO: Is there a better way of detecting this?
-var EventEmitter = typeof process === "object" ? require('events').EventEmitter : undefined, DOM = require('dom');
+var 
+	EventEmitter = typeof process === "object" ? require('events').EventEmitter : undefined, 
+	DOM = typeof window !== "undefined" ? window : require('dom'), 
+	Node = DOM.Node,
+	Document = DOM.Document;
 
 /**
  *
@@ -13,6 +17,11 @@ function Engine(opts) {
 	this.provider = opts.provider;
 	this.cache = { };
 	this.log = opts.log || console;
+	[ "debug", "info", "warn", "error" ].forEach(function(level) {
+		if (typeof this.log[level] === "undefined")
+			this.log[level] = this.log.log;
+	}, this)
+	
 }
 
 /**
@@ -23,55 +32,104 @@ function Engine(opts) {
 Engine.prototype.execute = function(dom, bindings, data, context, done) {
 
 	if (typeof done !== "function")
-		throw "Callback is not a function";
+		throw new TypeError("Callback is not a function");
+
+	var engine = this;
 
 	function handleFunction(that, f, data, callback) {
-		if (f.length === 3)
-			f.call(that, data, context, callback);
+		if (f.length === 4)
+			f.call(that, data, context, engine, callback);
 		else
-			callback(f.call(that, data, context));
+			callback(f.call(that, data, context, engine));
 	}
 
-	function update(element, options) {
+	function remove(element) {
+		element.parent.removeChild(element);
+		return null;
+	}
+
+	function empty(element) {
+		while (element.firstChild)
+			element.removeChild(element.firstChild);
+		return element;
+	}
+
+	function replace(element, replacement) {
+		var 
+			r = typeof replacement.length !== "undefined" && typeof replacement.splice === "function" ? replacement : [replacement],
+			parent = element.parentNode;
+		parent.replaceChild(r[0], element);
+		for (var i = 1; i < r.length; ++i)
+			parent.insertBefore(r[i], r[i-1].nextSibling)
+		return element;
+	}
+
+	function content(element, content) {
+		empty(element);
+		if (!(content instanceof Node))
+			content = dom.createTextNode(content);
+		element.appendChild(content);
+		return element;
 		
+	}
+
+	/*
+
+	
+	*/
+
+	function update(element, options, callback) {
+
 		var 
 			replacement = options.content,
 			attributes = options.attributes || { },
 			mode = options.mode || "content",
 			result = element;
+
+		if (replacement instanceof Document)
+			replacement = replacement.documentElement;
 		
 		if (options.hasOwnProperty('content')) {
+			
 			if (typeof replacement === "undefined") {
-				element.remove();
-				return null;
+				return callback(remove(element));
 			}
 			else if (replacement === null) {
 				switch(mode) {
 				case "replace":
-					element.remove();
-					return null;
+					return callback(remove(element));
 				case "content":
-					element.empty();
-					result = element;
+					result = empty(element);
 					break;
 				default:
 					throw "WTF?";
 				}
-				
-				
 			}
 			else if (typeof replacement.length !== "undefined" && typeof replacement.splice === "function") {
-				throw "WTF?";
+				var replacements = [];
+			 	//Loop through all elements in the data array
+		 		return parallel(replacement, function(item, i, next) {
+		 			update(element.cloneNode(true), {
+						content: item,
+						attributes: attributes,
+						mode: mode
+					}, function(node) {
+						replacements.push(node);
+						next();
+					})
+		 		}, function() {
+		 			//Replace the content with all the new nodes
+					result = replace(element, replacements);
+					callback(result)
+		 		});
 			}
 			else {
 				switch(mode) {
 				case "replace":
-					element.replace(replacement);
-					result = replacement;
+					result = replace(element, replacement);
 					break;
 				case "content":
-					element.content(replacement);
-					result = element;
+					result = content(element, replacement);
 					break;
 				default:
 					throw "WTF?";
@@ -88,7 +146,7 @@ Engine.prototype.execute = function(dom, bindings, data, context, done) {
 				result.setAttribute(name, value);
 		}
 
-		return result;
+		return callback(result);
 	}
 
 	function parallel(items, each, done) {
@@ -125,6 +183,10 @@ Engine.prototype.execute = function(dom, bindings, data, context, done) {
 
 		if (typeof done !== "function")
 			throw new Error("Callback given is not a function!");
+
+		if (typeof data === "function") {
+			data = data();
+		}
 		
 		//Loop through all the bindings
 		function process(selectors, bindings, si) {
@@ -154,12 +216,12 @@ Engine.prototype.execute = function(dom, bindings, data, context, done) {
 		 			transform(element.cloneNode(true), bindings, item, function(newNode) {
 						if (newNode)
 							//Add it to the replacement set
-							replacements[i](newNode);
+							replacements[i] = newNode;
 						next();
 					})
 		 		}, function() {
 		 			//Replace the content with all the new nodes
-					element.replace(replacements);
+					replace(element, replacements);
 					//Proceed
 					proceed();
 		 		})	
@@ -169,8 +231,8 @@ Engine.prototype.execute = function(dom, bindings, data, context, done) {
 			//Otherwise the data is not an array
 			else {
 
-				function handleKey(key, done) {
-
+				function handleKey(data, key, done) {
+					
 					//Control of the elements are delegated to a function
 					if (typeof key === "function") {
 
@@ -182,24 +244,18 @@ Engine.prototype.execute = function(dom, bindings, data, context, done) {
 								//If we get another key back
 					 			if (isRaw) {
 					 				//Recurse using the new key
-					 				handleKey(replacementData, next);
+					 				handleKey(data, replacementData, next);
 					 			}
 					 			else {
 					 				//Otherwise, if we get a plain ol object
 					 				if (typeof replacementData === "object" && replacementData.constructor === Object) {
 					 					//Assume the update command is from that object
-						 				update(element, replacementData);
-						 				//Proceed
-										next()
+						 				update(element, replacementData, next)
 						 			}
 						 			//Otherwise
 						 			else {
 						 				//Assume response is just content, and replace content
-						 				update(element, {
-											content: replacementData
-										});
-										//Proceed
-										next();
+						 				update(element, { content: replacementData }, next);
 						 			}
 					 			}
 					 			
@@ -211,21 +267,31 @@ Engine.prototype.execute = function(dom, bindings, data, context, done) {
 				 		
 					}
 					//Sub-key in use
-					else if (typeof key.bindings !== "undefined") {
-						parallel(elements, function(element, i, next) {
-							transform(element, key.bindings, data[key.data], next);
-						}, done)								
+					else if (typeof key.bindings !== "undefined" || typeof key.template !== "undefined") {
+						var localData = typeof key.data === "string" ? data[key.data] : key.data || data;
+						
+						if (key.template) {
+							
+							engine.template(key.template, key.bindings, localData, context, function(content) {
+								handleKey(localData, { mode: key.mode, attributes: key.attributes, content: content }, done)
+							})
+						}
+						else {
+							parallel(elements, function(element, i, next) {
+								transform(element, key.bindings, localData, next);
+							}, done)
+						}
+													
 					}
 					//Set of keys instead of just one
 					else if (Array.isArray(key)) {
 						//Apply the transform serially
 						serial(key, function(item, i, next) {
-							handleKey(item, next);
+							handleKey(data, item, next);
 						}, done)						
 					}
 					//Standard mapping
 					else {
-
 						parallel(elements, function(element, i, nextElement) {
 							var replacementData, replacementAttributes = { }, replacementMode = "content";
 
@@ -243,8 +309,16 @@ Engine.prototype.execute = function(dom, bindings, data, context, done) {
 										callback();
 									});
 									break;
+								case "object":
+									if (key.content instanceof Node)
+										replacementData = key.content;
+									else
+										replacementData = key.content.toString();
+									callback();
+									break;
 								default:
-									replacementData = "";
+									replacementData = typeof data !== "undefined" && data.hasOwnProperty(key) ? 
+										data[key] : "";
 									callback();
 								}
 							}
@@ -260,8 +334,7 @@ Engine.prototype.execute = function(dom, bindings, data, context, done) {
 									var 
 										attributes = key.attributes, 
 										names = Object.getOwnPropertyNames(attributes);
-
-									
+																		
 									parallel(names, function(name, i, next) {
 										var name = names[i], attrKey = attributes[name];
 											if (typeof attrKey === "function") {
@@ -271,7 +344,7 @@ Engine.prototype.execute = function(dom, bindings, data, context, done) {
 												});
 											} 
 											else {
-												attrData = data[attrKey]
+												replacementAttributes[name] = data[attrKey]
 												next();
 											}
 									}, callback)
@@ -284,22 +357,21 @@ Engine.prototype.execute = function(dom, bindings, data, context, done) {
 							parallel([ getContent, getMode, getAttributes], function(f, i, next) {
 								f(next);
 							}, function() {
+
 								update(element, {
 									content: replacementData,
 									attributes: replacementAttributes,
 									mode: replacementMode
-								});
-								nextElement();
+								}, nextElement);
+								
+								
+								
 							})
 						}, done)
 					}
 				}
 
-				
-				handleKey(key, function() {
-					proceed();
-				})
-				
+				handleKey(data, key, proceed)	
 			}
 			 	
 			
@@ -326,13 +398,38 @@ Engine.prototype.execute = function(dom, bindings, data, context, done) {
 /**
  *
  *
- *
+ * @note See https://sites.google.com/a/van-steenbeek.net/archive/explorer_domparser_parsefromstring
  */
 Engine.Parser = function(callback) {
 	this.buffer = "";
 	this.callback = callback;
-	if (typeof DOMParser !== "undefined") 
+	if (typeof DOMParser !== "undefined") { 
 		this.parser = new DOMParser();
+	}
+	else if (typeof ActiveXObject !== "undefined") {
+		this.parser = {
+			parseFromString: function(data) {
+				var xmldata = new ActiveXObject('MSXML.DomDocument');
+				xmldata.async = false;
+				xmldata.loadXML(data);
+				return xmldata;
+			}
+		}
+		
+	}
+	else if (typeof(XMLHttpRequest) != 'undefined') {
+		this.parser = {
+			parseFromString: function(data) {
+				var xmldata = new XMLHttpRequest(), contentType = 'application/xml';
+				xmldata.open('GET', 'data:' + contentType + ';charset=utf-8,' + encodeURIComponent(data), false);
+				if(xmldata.overrideMimeType) 
+					xmldata.overrideMimeType(contentType);
+				xmldata.send(null);
+				return xmldata.responseXML;
+			}
+		}
+	}
+	
 	else
 		this.parser =  DOM.parser(callback);
 }
@@ -389,8 +486,17 @@ Engine.prototype.template = function(name, bindings, data, context, done) {
 	default:
 		throw "Invalid number of arguments!";
 	}
+
+	if (typeof name !== "string" && name instanceof Document === false)
+		throw new TypeError("Template must be either a template string, a template name or a DOM tree.");
 	
+	if (typeof name === "string" && name.length === 0)
+		throw new Error("Template or its name must be greater than 0 characters in length.");
+
 	if (name[0] !== "<") {
+		if (!engine.provider)
+			throw new Error("No provider to fetch templates from!");
+		
 		engine.log.debug("Fetching template "+name+"...");
 		var cachedTemplate = this.cache[name];
 			
@@ -411,7 +517,7 @@ Engine.prototype.template = function(name, bindings, data, context, done) {
 				mtime: Date.now(),
 				outdated: false
 			};
-			dom.getDocumentElement().attributes["data-template"] = name;
+			dom.documentElement.attributes["data-template"] = name;
 			engine.log.debug("Rendering "+name+"...");
 			engine.execute(dom.cloneNode(true), bindings, data, context, done);
 		});
@@ -430,7 +536,7 @@ Engine.prototype.template = function(name, bindings, data, context, done) {
 				p.end();
 			}
 			else {
-				throw "Could not find template "+name;
+				throw new Error("Could not find template "+name);
 			}
 		});
 	}
@@ -461,4 +567,4 @@ exports.engine = function(opts) {
 	return new Engine(opts);
 };
 
-})(exports || {});
+})(typeof exports !== "undefined" ? exports : window.Template = { });

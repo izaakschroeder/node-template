@@ -1,8 +1,6 @@
 
 $(function() {
-	var engine = Template.engine({
-		provider: new BrowserProvider()
-	});
+	var engine = Template.engine();
 
 	$.ajaxSetup({ cache: false });
 

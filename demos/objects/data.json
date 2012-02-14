@@ -1,0 +1,12 @@
+{
+	"mannan": {
+		"name": "Twizzlr",
+		"stats": {
+			"mostPlayedHero": "Armadon",
+			"kills": 500,
+			"deaths": 4000,
+			"assists": 600
+		},
+		"happiness": 5
+	}
+}

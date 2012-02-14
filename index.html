@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Template Sandbox</title>
+		<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
+		<script type="text/javascript" src="../template.js"></script>
+		<script type="text/javascript" src="../providers/browser.js"></script>
+
+
+		<link rel="stylesheet" type="text/css" href="css/bootstrap.css"/>
+		<link rel="stylesheet" type="text/css" href="css/codemirror.css"/>
+		<link rel="stylesheet" type="text/css" href="css/global.css"/>
+
+		<script type="text/javascript" src="js/bootstrap.js"></script>
+		<script type="text/javascript" src="js/codemirror.js"></script>
+		<script type="text/javascript" src="js/javascript.js"></script>
+		<script type="text/javascript" src="js/xml.js"></script>
+		<script type="text/javascript" src="js/sandbox.js"></script>
+	</head>
+	<body style="padding-top: 60px;">
+		<div class="navbar navbar-fixed-top">
+			<div class="navbar-inner">
+				<div class="container">
+					<a class="brand" href="#">
+						Template
+					</a>
+					<ul class="nav">
+						<li><a href="">Overview</a></li>
+						<li><a href="">Sandbox</a></li>
+						<li><a href="">API</a></li>
+						<li><a href="">Bindings</a></li>
+					</ul>
+				</div>
+			</div>
+		</div>
+		
+
+		<div class="container">
+			
+
+			<section id="overview">
+				<div class="page-header">
+					<h1>Overview</h1>
+				</div>
+
+				<p>
+					Template is a simple, full-featured templating system based on CSS selectors. It is
+					capable of running both in the browser and in node.
+				</p>
+
+				<p> Installation is straightforward:</p>
+
+				<div class="row">
+					<div class="span4">
+						<h3>Node.JS</h3>
+						<code>$ npm install template</code>
+					</div>
+					
+					<div class="span6">
+						<h3>Browser</h3>
+						<code>&lt;script type="text/javascript" src="template.js"/&gt;</code>
+					</div>
+				</div>
+
+
+				<div class="row">
+					<div class="span4">
+						Important notes:
+						<ul>
+							<li>Templates can only have ONE root element.
+							</li>
+							<li>
+								Your template's root element should contain <code>xmlns="http://www.w3.org/1999/xhtml"</code> (certain features may not work without this).
+							</li>
+						</ul>
+					</div>
+				</div>
+				
+			</section>
+
+			<section id="sandbox">
+				<div class="page-header">
+					<h1>Sandbox</h1>
+				</div>
+
+				<div class="well" style="border: dashed 6px #aaa;">
+					<div id="Output">
+						Output
+					</div>
+				</div>
+
+				<form id="DemoSelection" class="form-inline ">
+					<div class="control-group">
+						<label>Select a demo as a starting point:</label>
+						<select name="demo">
+							<optgroup label="Canonical Demos">
+								<option value="hello-world">Hello World</option>
+							</optgroup>
+							<optgroup label="Feature Demos">
+								<option value="nested-templates">Nested Templates</option>
+								<option value="attributes">Attributes</option>
+								<option value="lists">Lists</option>
+								<option value="objects">Objects</option>
+								<option value="recursion">Recursion</option>
+								<option value="async-callbacks">Asynchronous Callbacks</option>
+								<option value="element-manipulation">Element Manipulation</option>
+							</optgroup>
+							<optgroup label="Use Cases">
+								<option value="lists">Lists</option>
+							</optgroup>
+						</select>
+						<input class="btn btn-primary" type="submit" value="Load Demo"/>
+					</div>
+						
+				</form>
+
+				<form class="form-vertical" id="TemplateInput" onsubmit="render(); return false;">
+					<div class="control-group" style="width: 50%; display: inline-block; vertical-align: top;">
+						<label>Template Code:</label>
+						<div class="controls"><textarea name="template" data-language="xml"></textarea></div>
+					</div><div class="control-group" style="width: 50%; display: inline-block; vertical-align: top;">
+						<label>Bindings:</label>
+						<div class="controls"><textarea name="bindings" data-language="javascript"></textarea></div>
+					</div>
+
+					<div class="control-group">
+						<label>Data:</label>
+						<div class="controls"><textarea name="data" data-language="javascript"></textarea></div>
+					</div>
+				</form>
+			</section>
+
+			<section id="api">
+				<div class="page-header">
+					<h1>API</h1>
+				</div>
+			</section>
+
+			<section id="bindings">
+				<div class="page-header">
+					<h1>Bindings</h1>
+				</div>
+			</section>
+		</div>
+	</body>
+</html>

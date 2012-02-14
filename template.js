@@ -558,12 +558,6 @@ Engine.prototype.template = function(name, bindings, data, context, done) {
  *
  */
 exports.engine = function(opts) {
-	opts = opts || { };
-	if (!opts.provider) {
-		var FileSystemProvider = require('template/providers/filesystem');
-		opts.provider = new FileSystemProvider();
-	}
-	
 	return new Engine(opts);
 };
 

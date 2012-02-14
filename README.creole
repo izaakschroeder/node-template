@@ -1,3 +1,11 @@
 = Template =
 
+https://izaakschroeder.github.com/node-template
+
+{{{
+
+$ npm install template
+
+}}}
+
 A simple CSS selector-based template engine capable of working both in browser and in node.js.

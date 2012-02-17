@@ -189,10 +189,7 @@ Engine.prototype.execute = function(dom, bindings, data, context, done) {
 			throw new Error("Callback given is not a function!");
 
 		if (typeof data === "function") {
-			return handleFunction(data, data, undefined, context, function(data) {
-				transform(element, bindings, data, done);
-			})
-			
+			data = data();
 		}
 		
 		//Loop through all the bindings

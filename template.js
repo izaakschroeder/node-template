@@ -68,7 +68,7 @@ Engine.prototype.execute = function(dom, bindings, data, context, done) {
 	function content(element, content) {
 		empty(element);
 		if (!(content instanceof Node))
-			content = dom.createTextNode(content);
+			content = dom.createTextNode('' + content);
 		element.appendChild(content);
 		return element;
 		
@@ -224,7 +224,7 @@ Engine.prototype.execute = function(dom, bindings, data, context, done) {
 		 			//Replace the content with all the new nodes
 					replace(element, replacements);
 					//Proceed
-					proceed();
+					done(replacements[0]);
 		 		})	
 						
 				

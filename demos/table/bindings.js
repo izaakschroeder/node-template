@@ -6,7 +6,7 @@
 			".Age": "age",
 			"[name=fruit]": {
 				data: function(data, context) { 
-					return c.fruits; 
+					return context.data.fruits; 
 				},
 				bindings: {
 					"option": {

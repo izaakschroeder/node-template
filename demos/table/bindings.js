@@ -3,8 +3,23 @@
 		data: "records",
 		bindings: {
 			".Name": "name",
-			x: "b" 
+			".Age": "age",
+			"[name=fruit]": {
+				data: function(data, context) { 
+					return c.fruits; 
+				},
+				bindings: {
+					"option": {
+						attributes: {
+							value: "id",
+							selected: function(user) {
+								return user.fruit === this.value;
+							}
+						},
+						content: "name"
+					}
+				}
+			}
 		}
-	},
-	
+	}
 }

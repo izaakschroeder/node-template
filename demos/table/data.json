@@ -2,7 +2,7 @@
 	"records": [
 		{ "name": "Amy", "age": 26, "fruit": "m" },
 		{ "name": "Izaak", "age": 23, "fruit": "m" },
-		{ "name": "Bob", "age": 15, "fruit": "m" }
+		{ "name": "Bob", "age": 15, "fruit": "o" }
 	],
 	"fruits": [
 		{ "id": "m", "name": "Mango" },

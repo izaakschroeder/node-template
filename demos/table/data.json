@@ -1,0 +1,11 @@
+{
+	"records": [
+		{ "name": "Amy", "age": 26, "fruit": "m" },
+		{ "name": "Izaak", "age": 23, "fruit": "m" },
+		{ "name": "Bob", "age": 15, "fruit": "m" }
+	],
+	"fruits": [
+		{ "id": "m", "name": "Mango" },
+		{ "id": "o", "name": "Orange" }
+	]
+}

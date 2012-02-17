@@ -38,7 +38,24 @@ Engine.prototype.execute = function(dom, bindings, data, context, done) {
 	var engine = this;
 
 	context = context || { };
-	context.data = data;
+
+	function handleData(oldData, data, callback) {
+		switch(typeof data) {
+		case "function":
+			return handleFunction(data, data, oldData, callback);
+		case "string":
+			if (!oldData)
+				throw new Error("No data to get a key out of!");
+			return callback(oldData[data]);
+		case "object":
+			return callback(data);
+		case "null":
+		case "undefined":
+			return callback(oldData);
+		default:
+			throw new TypeError("Data is neither a string, function, nor object!");
+		}
+	}
 
 	function handleFunction(that, f, data, callback) {
 		if (f.length === 4)
@@ -188,10 +205,6 @@ Engine.prototype.execute = function(dom, bindings, data, context, done) {
 		if (typeof done !== "function")
 			throw new Error("Callback given is not a function!");
 
-		if (typeof data === "function") {
-			data = data();
-		}
-		
 		//Loop through all the bindings
 		function process(selectors, bindings, si) {
 
@@ -217,10 +230,12 @@ Engine.prototype.execute = function(dom, bindings, data, context, done) {
 			 	var replacements = [];
 			 	//Loop through all elements in the data array
 		 		parallel(data, function(item, i, next) {
+		 			
 		 			transform(element.cloneNode(true), bindings, item, function(newNode) {
 						if (newNode)
 							//Add it to the replacement set
 							replacements[i] = newNode;
+
 						next();
 					})
 		 		}, function() {
@@ -273,20 +288,19 @@ Engine.prototype.execute = function(dom, bindings, data, context, done) {
 					}
 					//Sub-key in use
 					else if (typeof key.bindings !== "undefined" || typeof key.template !== "undefined") {
-						var localData = typeof key.data === "string" ? data[key.data] : key.data || data;
-						
-						if (key.template) {
-							
-							engine.template(key.template, key.bindings, localData, context, function(content) {
-								handleKey(localData, { mode: key.mode, attributes: key.attributes, content: content }, done)
-							})
-						}
-						else {
-							parallel(elements, function(element, i, next) {
-								transform(element, key.bindings, localData, next);
-							}, done)
-						}
-													
+						handleData(data, key.data, function(localData) {
+							if (key.template) {
+								
+								engine.template(key.template, key.bindings, localData, context, function(content) {
+									handleKey(localData, { mode: key.mode, attributes: key.attributes, content: content }, done)
+								})
+							}
+							else {
+								parallel(elements, function(element, i, next) {
+									transform(element, key.bindings, localData, next);
+								}, done)
+							}
+						})							
 					}
 					//Set of keys instead of just one
 					else if (Array.isArray(key)) {
@@ -397,7 +411,12 @@ Engine.prototype.execute = function(dom, bindings, data, context, done) {
 
 	}
 	
-	transform(dom, bindings, data, done);	
+	handleData(context, data, function(data) {
+		context.data = data;
+		transform(dom, bindings, data, done);
+	})
+
+		
 }
 
 /**

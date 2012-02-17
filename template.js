@@ -37,6 +37,9 @@ Engine.prototype.execute = function(dom, bindings, data, context, done) {
 
 	var engine = this;
 
+	context = context || { };
+	context.data = data;
+
 	function handleFunction(that, f, data, callback) {
 		if (f.length === 4)
 			f.call(that, data, context, engine, callback);
@@ -224,6 +227,7 @@ Engine.prototype.execute = function(dom, bindings, data, context, done) {
 		 			//Replace the content with all the new nodes
 					replace(element, replacements);
 					//Proceed
+					//FIXME: Is this right?
 					done(replacements[0]);
 		 		})	
 						

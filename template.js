@@ -30,19 +30,17 @@ function Engine(opts) {
  *
  *
  */
-Engine.prototype.execute = function(dom, bindings, data, context, done) {
+Engine.prototype.execute = function(dom, bindings, data, userContext, done) {
 
 	if (typeof done !== "function")
 		throw new TypeError("Callback is not a function");
 
-	var engine = this;
+	var engine = this, executionContext = { engine: engine };
 
-	context = context || { };
-
-	function handleData(that, oldData, data, callback) {
+	function handleData(oldData, data, callback) {
 		switch(typeof data) {
 		case "function":
-			return handleFunction(that, data, oldData, callback);
+			return handleFunction(originData, data, oldData, callback);
 		case "string":
 			if (!oldData)
 				throw new Error("No data to get a key out of!");
@@ -59,9 +57,9 @@ Engine.prototype.execute = function(dom, bindings, data, context, done) {
 
 	function handleFunction(that, f, data, callback) {
 		if (f.length === 4)
-			f.call(that, data, context, engine, callback);
+			f.call(that, data, userContext, engine, callback);
 		else
-			callback(f.call(that, data, context, engine));
+			callback(f.call(that, data, userContext, engine));
 	}
 
 	function remove(element) {
@@ -223,181 +221,167 @@ Engine.prototype.execute = function(dom, bindings, data, context, done) {
 				elements = element.querySelectorAll(selector),
 				//Get the thing we're replacing the selector with
 				key = bindings[selector];
+
 			
-			//If the data is an array
-			if (typeof data !== "undefined" && typeof data.length !== "undefined" && typeof data.splice === "function") {
-				//Create a set of replacements
-			 	var replacements = [];
-			 	//Loop through all elements in the data array
-		 		parallel(data, function(item, i, next) {
-		 			
-		 			transform(element.cloneNode(true), bindings, item, function(newNode) {
-						if (newNode)
-							//Add it to the replacement set
-							replacements[i] = newNode;
 
-						next();
-					})
-		 		}, function() {
-		 			//Replace the content with all the new nodes
-					replace(element, replacements);
-					//Proceed
-					//FIXME: Is this right?
-					done(replacements[0]);
-		 		})	
-						
+
+			function handleKey(elements, data, key, done) {
+
 				
-			}
-			//Otherwise the data is not an array
-			else {
+				//Control of the elements are delegated to a function
+				if (typeof key === "function") {
 
-				function handleKey(data, key, done) {
-					
-					//Control of the elements are delegated to a function
-					if (typeof key === "function") {
+					//Go through all the elements
+					return parallel(elements, function(element, i, next) {
 
-						//Go through all the elements
-						parallel(elements, function(element, i, next) {
-
-							//Call that function on a per-element basis
-							handleFunction(element, key, data, function(replacementData, isRaw) {
-								//If we get another key back
-					 			if (isRaw) {
-					 				//Recurse using the new key
-					 				handleKey(data, replacementData, next);
+						//Call that function on a per-element basis
+						handleFunction(element, key, data, function(replacementData, isRaw) {
+							//If we get another key back
+				 			if (isRaw) {
+				 				//Recurse using the new key
+				 				handleKey(elements, data, replacementData, next);
+				 			}
+				 			else {
+				 				//Otherwise, if we get a plain ol object
+				 				if (typeof replacementData === "object" && replacementData.constructor === Object) {
+				 					//Assume the update command is from that object
+					 				update(element, replacementData, next)
 					 			}
+					 			//Otherwise
 					 			else {
-					 				//Otherwise, if we get a plain ol object
-					 				if (typeof replacementData === "object" && replacementData.constructor === Object) {
-					 					//Assume the update command is from that object
-						 				update(element, replacementData, next)
-						 			}
-						 			//Otherwise
-						 			else {
-						 				//Assume response is just content, and replace content
-						 				update(element, { content: replacementData }, next);
-						 			}
+					 				//Assume response is just content, and replace content
+					 				update(element, { content: replacementData }, next);
 					 			}
-					 			
-					 			
-					 		});
-						}, done)
-
-				 		
-				 		
-					}
-					//Sub-key in use
-					else if (typeof key.bindings !== "undefined" || typeof key.template !== "undefined") {
-						handleData(key.data, data, key.data, function(localData) {
-							if (key.template) {
-								
-								engine.template(key.template, key.bindings, localData, context, function(content) {
-									handleKey(localData, { mode: key.mode, attributes: key.attributes, content: content }, done)
-								})
-							}
-							else {
-								parallel(elements, function(element, i, next) {
-									transform(element, key.bindings, localData, next);
-								}, done)
-							}
-						})							
-					}
-					//Set of keys instead of just one
-					else if (Array.isArray(key)) {
-						//Apply the transform serially
-						serial(key, function(item, i, next) {
-							handleKey(data, item, next);
-						}, done)						
-					}
-					//Standard mapping
-					else {
-						parallel(elements, function(element, i, nextElement) {
-							
-							var replacementData, replacementAttributes = { }, replacementMode = "content";
-
-							handleData(element, undefined, data, function(data) {
-								
-								function getContent(callback) {
-									//Content
-									switch(typeof key.content) {
-									case "number":
-									case "string":
-										replacementData = data[key.content];
-										callback();
-										break;
-									case "function":
-										handleFunction(element, key.content, data, function(x) {
-											replacementData = x;
-											callback();
-										});
-										break;
-									case "object":
-										if (key.content instanceof Node)
-											replacementData = key.content;
-										else
-											replacementData = key.content.toString();
-										callback();
-										break;
-									default:
-										replacementData = typeof data !== "undefined" && data.hasOwnProperty(key) ? 
-											data[key] : "";
-										callback();
-									}
-								}
-
-								function getMode(callback) {
-									replacementMode = key.mode || "content";
-									callback();
-								}
-
-								function getAttributes(callback) {
-									//Attributes
-									if (key.attributes) {
-										var 
-											attributes = key.attributes, 
-											names = Object.getOwnPropertyNames(attributes);
-																			
-										parallel(names, function(name, i, next) {
-											var name = names[i], attrKey = attributes[name];
-												if (typeof attrKey === "function") {
-													handleFunction(element, attrKey, data, function(attrData) {
-														replacementAttributes[name] = attrData;
-														next();
-													});
-												} 
-												else {
-													replacementAttributes[name] = data[attrKey]
-													next();
-												}
-										}, callback)
-									}
-									else {
-										callback();
-									}
-								}
-
-								parallel([ getContent, getMode, getAttributes], function(f, i, next) {
-									f(next);
-								}, function() {
-
-									update(element, {
-										content: replacementData,
-										attributes: replacementAttributes,
-										mode: replacementMode
-									}, nextElement);
-								})
-							})
-							
-
-							
-						}, done)
-					}
+				 			}
+				 			
+				 			
+				 		});
+					}, done)
 				}
 
-				handleKey(data, key, proceed)	
+				
+				//If the data is an array
+				if (typeof data !== "undefined" && typeof data.length !== "undefined" && typeof data.splice === "function") {
+				 	//Loop through all elements in the data array
+			 			
+		 			parallel(elements, function(element, i, nextElement) {
+		 				var newElements = [ ];
+		 				serial(data, function(item, i, nextData) {
+		 					var newElement = element.cloneNode(true);
+		 					newElements.push(newElement);
+		 					handleKey([newElement], item, key, nextData);
+		 				}, function() {
+		 					replace(element, newElements);
+		 					nextElement();
+		 				});
+
+		 			}, proceed);
+
+				}
+				//Sub-key in use
+				else if (typeof key.bindings !== "undefined" || typeof key.template !== "undefined") {
+					
+					if (key.template) {
+						
+						engine.template(key.template, key.bindings, data, userContext, function(content) {
+							handleKey(elements, data, { mode: key.mode, attributes: key.attributes, content: content }, done)
+						})
+					}
+					else {
+						parallel(elements, function(element, i, next) {
+							transform(element, key.bindings, data, next);
+						}, done)
+					}
+											
+				}
+				//Set of keys instead of just one
+				else if (Array.isArray(key)) {
+					//Apply the transform serially
+					serial(key, function(item, i, next) {
+						handleKey(elements, data, item, next);
+					}, done)						
+				}
+				//Standard mapping
+				else {
+					parallel(elements, function(element, i, nextElement) {
+						
+						var replacementData, replacementAttributes = { }, replacementMode = "content";
+
+						function getContent(callback) {
+							//Content
+							switch(typeof key.content) {
+							case "number":
+							case "string":
+								replacementData = data[key.content];
+								callback();
+								break;
+							case "function":
+								handleFunction(element, key.content, data, function(x) {
+									replacementData = x;
+									callback();
+								});
+								break;
+							case "object":
+								if (key.content instanceof Node)
+									replacementData = key.content;
+								else
+									replacementData = key.content.toString();
+								callback();
+								break;
+							default:
+								replacementData = typeof data !== "undefined" && data.hasOwnProperty(key) ? 
+									data[key] : "";
+								callback();
+							}
+						}
+
+						function getMode(callback) {
+							replacementMode = key.mode || "content";
+							callback();
+						}
+
+						function getAttributes(callback) {
+							//Attributes
+							if (key.attributes) {
+								var 
+									attributes = key.attributes, 
+									names = Object.getOwnPropertyNames(attributes);
+																	
+								parallel(names, function(name, i, next) {
+									var name = names[i], attrKey = attributes[name];
+										if (typeof attrKey === "function") {
+											handleFunction(element, attrKey, data, function(attrData) {
+												replacementAttributes[name] = attrData;
+												next();
+											});
+										} 
+										else {
+											replacementAttributes[name] = data[attrKey]
+											next();
+										}
+								}, callback)
+							}
+							else {
+								callback();
+							}
+						}
+
+						parallel([ getContent, getMode, getAttributes], function(f, i, next) {
+							f(next);
+						}, function() {
+							update(element, {
+								content: replacementData,
+								attributes: replacementAttributes,
+								mode: replacementMode
+							}, nextElement);
+						})
+					}, done)
+				}
 			}
-			 	
-			
+
+			handleData(data, key.data, function(data) {
+				handleKey(elements, data, key, proceed)
+			})
 		}
 
 		if (Array.isArray(bindings)) {
@@ -415,10 +399,9 @@ Engine.prototype.execute = function(dom, bindings, data, context, done) {
 
 	}
 	
-	handleData(data, context, data, function(data) {
-		context.data = data;
-		transform(dom, bindings, data, done);
-	})
+
+	transform(dom, bindings, data, done);
+	
 
 		
 }

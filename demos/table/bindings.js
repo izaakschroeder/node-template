@@ -5,7 +5,7 @@
 			".Name": "name",
 			".Age": "age",
 			"[name=fruit]": {
-				data: function(data, context) { 
+				data: function(data, context) {
 					return context.data.fruits; 
 				},
 				bindings: {
@@ -13,7 +13,7 @@
 						attributes: {
 							value: "id",
 							selected: function(user) {
-								return user.fruit === this.value;
+								return user.fruit === this.value ? "selected" : undefined;
 							}
 						},
 						content: "name"

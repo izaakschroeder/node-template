@@ -35,7 +35,7 @@ Engine.prototype.execute = function(dom, bindings, data, userContext, done) {
 	if (typeof done !== "function")
 		throw new TypeError("Callback is not a function");
 
-	var engine = this, executionContext = { engine: engine };
+	var engine = this, originData = data, executionContext = { engine: engine };
 
 	function handleData(oldData, data, callback) {
 		switch(typeof data) {

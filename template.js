@@ -39,10 +39,10 @@ Engine.prototype.execute = function(dom, bindings, data, context, done) {
 
 	context = context || { };
 
-	function handleData(oldData, data, callback) {
+	function handleData(that, oldData, data, callback) {
 		switch(typeof data) {
 		case "function":
-			return handleFunction(data, data, oldData, callback);
+			return handleFunction(that, data, oldData, callback);
 		case "string":
 			if (!oldData)
 				throw new Error("No data to get a key out of!");
@@ -288,7 +288,7 @@ Engine.prototype.execute = function(dom, bindings, data, context, done) {
 					}
 					//Sub-key in use
 					else if (typeof key.bindings !== "undefined" || typeof key.template !== "undefined") {
-						handleData(data, key.data, function(localData) {
+						handleData(key.data, data, key.data, function(localData) {
 							if (key.template) {
 								
 								engine.template(key.template, key.bindings, localData, context, function(content) {
@@ -312,80 +312,84 @@ Engine.prototype.execute = function(dom, bindings, data, context, done) {
 					//Standard mapping
 					else {
 						parallel(elements, function(element, i, nextElement) {
+							
 							var replacementData, replacementAttributes = { }, replacementMode = "content";
 
-							function getContent(callback) {
-								//Content
-								switch(typeof key.content) {
-								case "number":
-								case "string":
-									replacementData = data[key.content];
-									callback();
-									break;
-								case "function":
-									handleFunction(element, key.content, data, function(x) {
-										replacementData = x;
+							handleData(element, undefined, data, function(data) {
+								
+								function getContent(callback) {
+									//Content
+									switch(typeof key.content) {
+									case "number":
+									case "string":
+										replacementData = data[key.content];
 										callback();
-									});
-									break;
-								case "object":
-									if (key.content instanceof Node)
-										replacementData = key.content;
-									else
-										replacementData = key.content.toString();
-									callback();
-									break;
-								default:
-									replacementData = typeof data !== "undefined" && data.hasOwnProperty(key) ? 
-										data[key] : "";
+										break;
+									case "function":
+										handleFunction(element, key.content, data, function(x) {
+											replacementData = x;
+											callback();
+										});
+										break;
+									case "object":
+										if (key.content instanceof Node)
+											replacementData = key.content;
+										else
+											replacementData = key.content.toString();
+										callback();
+										break;
+									default:
+										replacementData = typeof data !== "undefined" && data.hasOwnProperty(key) ? 
+											data[key] : "";
+										callback();
+									}
+								}
+
+								function getMode(callback) {
+									replacementMode = key.mode || "content";
 									callback();
 								}
-							}
 
-							function getMode(callback) {
-								replacementMode = key.mode || "content";
-								callback();
-							}
-
-							function getAttributes(callback) {
-								//Attributes
-								if (key.attributes) {
-									var 
-										attributes = key.attributes, 
-										names = Object.getOwnPropertyNames(attributes);
-																		
-									parallel(names, function(name, i, next) {
-										var name = names[i], attrKey = attributes[name];
-											if (typeof attrKey === "function") {
-												handleFunction(element, attrKey, data, function(attrData) {
-													replacementAttributes[name] = attrData;
+								function getAttributes(callback) {
+									//Attributes
+									if (key.attributes) {
+										var 
+											attributes = key.attributes, 
+											names = Object.getOwnPropertyNames(attributes);
+																			
+										parallel(names, function(name, i, next) {
+											var name = names[i], attrKey = attributes[name];
+												if (typeof attrKey === "function") {
+													handleFunction(element, attrKey, data, function(attrData) {
+														replacementAttributes[name] = attrData;
+														next();
+													});
+												} 
+												else {
+													replacementAttributes[name] = data[attrKey]
 													next();
-												});
-											} 
-											else {
-												replacementAttributes[name] = data[attrKey]
-												next();
-											}
-									}, callback)
+												}
+										}, callback)
+									}
+									else {
+										callback();
+									}
 								}
-								else {
-									callback();
-								}
-							}
 
-							parallel([ getContent, getMode, getAttributes], function(f, i, next) {
-								f(next);
-							}, function() {
+								parallel([ getContent, getMode, getAttributes], function(f, i, next) {
+									f(next);
+								}, function() {
 
-								update(element, {
-									content: replacementData,
-									attributes: replacementAttributes,
-									mode: replacementMode
-								}, nextElement);
-								
-								
-								
+									update(element, {
+										content: replacementData,
+										attributes: replacementAttributes,
+										mode: replacementMode
+									}, nextElement);
+								})
 							})
+							
+
+							
 						}, done)
 					}
 				}
@@ -411,7 +415,7 @@ Engine.prototype.execute = function(dom, bindings, data, context, done) {
 
 	}
 	
-	handleData(context, data, function(data) {
+	handleData(data, context, data, function(data) {
 		context.data = data;
 		transform(dom, bindings, data, done);
 	})

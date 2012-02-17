@@ -4,21 +4,18 @@
 		bindings: {
 			".Name": "name",
 			".Age": "age",
-			"[name=fruit]": {
+			"[name=fruit] option": {
 				data: function(data, context) {
 					return context.data.fruits; 
 				},
-				bindings: {
-					"option": {
-						attributes: {
-							value: "id",
-							selected: function(user) {
-								return user.fruit === this.value ? "selected" : undefined;
-							}
-						},
-						content: "name"
+				attributes: {
+					value: "id",
+					selected: function(user) {
+						return user.fruit === this.value ? "selected" : undefined;
 					}
-				}
+				},
+				content: "name"
+				
 			}
 		}
 	}

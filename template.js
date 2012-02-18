@@ -248,7 +248,7 @@ Engine.prototype.execute = function(dom, bindings, data, userContext, done) {
 			
 			var selectors = Object.getOwnPropertyNames(bindings || { });
 
-			if (typeof bindings !== "object")
+			if (bindings && typeof bindings !== "object")
 				throw new TypeError("Bindings must be an object!");
 			
 			//Loop through all the bindings; doing it in serial in case one selector somehow

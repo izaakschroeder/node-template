@@ -39,17 +39,15 @@ Stack.prototype.concat = function(obj) {
 				obj[item] = top[item];
 		})
 
+	if (typeof  obj.data.bindings !== "undefined")
+		throw new Error("Data with bindings..")
 
+	if (obj.data instanceof Array && obj.data.length > 0 && obj.data[0].bindings)
+		throw new Error("FFUUUU");
 
 	var out =  this.slice();
 	out.__proto__ = this; //LOL should we even be doing this?
 	out.push(obj)
-
-	if (out.top.key === undefined) {
-		console.log(this)
-		console.log(out)
-		//throw new Error("Got some undefined key yo")
-	}
 
 	return out;
 }
@@ -84,7 +82,7 @@ Engine.prototype.execute = function(dom, bindings, data, userContext, done) {
 			return callback(data);
 		case "null":
 		case "undefined":
-			return callback(stack);
+			return callback(oldData);
 		default:
 			throw new TypeError("Data is neither a string, function, nor object!");
 		}
@@ -259,8 +257,7 @@ Engine.prototype.execute = function(dom, bindings, data, userContext, done) {
 
 				function handleKey(elements, stack, done) {
 
-					var top = stack.top, data = top.data, key = top.key;
-
+					var top = stack.top, data = top.data, key = top.key, bindings = top.bindings;
 					
 					//Control of the elements are delegated to a function
 					if (typeof key === "function") {

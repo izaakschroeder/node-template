@@ -39,12 +39,6 @@ Stack.prototype.concat = function(obj) {
 				obj[item] = top[item];
 		})
 
-	if (typeof  obj.data.bindings !== "undefined")
-		throw new Error("Data with bindings..")
-
-	if (obj.data instanceof Array && obj.data.length > 0 && obj.data[0].bindings)
-		throw new Error("FFUUUU");
-
 	var out =  this.slice();
 	out.__proto__ = this; //LOL should we even be doing this?
 	out.push(obj)

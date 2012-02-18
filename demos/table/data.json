@@ -1,8 +1,8 @@
 {
 	"records": [
-		{ "name": "Amy", "age": 26, "fruit": "m" },
-		{ "name": "Izaak", "age": 23, "fruit": "m" },
-		{ "name": "Bob", "age": 15, "fruit": "o" }
+		{ "name": "Amy", "age": 26, "fruit": "m", "awesome": true, "weight": 102.3 },
+		{ "name": "Izaak", "age": 23, "fruit": "m", "awesome": true, "weight": 137.5 },
+		{ "name": "Bob", "age": 15, "fruit": "o", "weight": 185.4 }
 	],
 	"fruits": [
 		{ "id": "m", "name": "Mango" },

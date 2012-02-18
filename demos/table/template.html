@@ -1,15 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <div xmlns="http://www.w3.org/1999/xhtml">
-	<table>
-		<thead>
-			<tr><td>Name</td><td>Age</td><td>Fruit</td></tr>
-		</thead>
-		<tbody>
-			<tr>
-				<td class="Name"/>
-				<td class="Age"/>
-				<td class="Fruit"><form><select name="fruit"><option/></select></form></td>
-			</tr>
-		</tbody>
-	</table>
+	<form class="form-inline">
+		<table class="table table-striped">
+			<thead>
+				<tr>
+					<th>Name</th>
+					<th>Age</th>
+					<th>Fruit</th>
+					<th>Weight</th>
+					<th>Awesomeness</th>
+				</tr>
+			</thead>
+			<tbody>
+				<tr>
+					<td class="Name"/>
+					<td class="Age"/>
+					<td class="Fruit"><select name="fruit"><option/></select></td>
+					<td class="Weight"><input type="number" style="width: 100px;"/> lbs.</td>
+					<td class="Awesome"><input type="checkbox"/> Awesome</td>
+				</tr>
+			</tbody>
+		</table>
+	</form>
 </div>

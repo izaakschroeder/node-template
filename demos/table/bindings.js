@@ -17,6 +17,18 @@
 				},
 				content: "name"
 				
+			},
+			"[type=checkbox]": {
+				attributes: {
+					checked: function(user) {
+						return user.awesome ? "checked" : undefined;
+					}
+				}
+			},
+			"[type=number]": {
+				attributes: {
+					value: "weight"
+				}
 			}
 		}
 	}

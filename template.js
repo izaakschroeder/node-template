@@ -602,7 +602,7 @@ Engine.prototype.template = function(name, bindings, data, context, done) {
 		name = name;
 		break;
 	case 2: //name, done OR name, bindings
-		if (typeof arguments[2] === "function") {
+		if (typeof arguments[1] === "function") {
 			done = bindings;
 			bindings = { };
 		}	

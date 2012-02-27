@@ -8,22 +8,6 @@ var
 	Node = DOM.Node,
 	Document = DOM.Document;
 
-/**
- *
- *
- *
- */
-function Engine(opts) {
-	opts = opts || { };
-	this.provider = opts.provider;
-	this.cache = { };
-	this.log = opts.log || console;
-	[ "debug", "info", "warn", "error" ].forEach(function(level) {
-		if (typeof this.log[level] === "undefined")
-			this.log[level] = this.log.log;
-	}, this)
-	
-}
 
 function Stack() {
 	Array.apply(this, arguments);
@@ -49,6 +33,106 @@ Stack.prototype.concat = function(obj) {
 Stack.prototype.__defineGetter__("top", function() {
 	return this[this.length - 1];
 })
+
+function Template(engine, dom, bindings, context) {
+	this.engine = engine;
+	this.bindings = bindings;
+	this.todo = [ ];
+	this.dom = undefined;
+
+	var self = this;
+	//DOM is a document tree
+	if (dom instanceof Document) {
+		this.dom = dom;
+	}
+	//DOM is actually raw XML so just parse it out
+	else if (dom[0] === "<") {
+		//engine.log.debug("Rendering raw template data...");
+		Engine.parse(dom, function(dom) {
+			self.dom = dom;
+			self.processTodo();
+		});
+	}
+	//DOM is the name of a template
+	else {
+		engine.data(dom, function(dom) {
+			self.dom = dom;
+			self.processTodo();
+		})		
+	}
+
+
+}
+
+Template.prototype.processTodo = function() {
+	for (var i = 0; i < this.todo.length; ++i)
+		this.engine.execute(this.dom.cloneNode(true), this.bindings, this.todo[i][0], this.todo[i][1], this.todo[i][2]);
+}
+
+Template.prototype.render = function(data, userContext, done) {
+	if (typeof done === "undefined") {
+		done = userContext;
+		userContext = undefined;
+	}
+	if (!this.dom)
+		return this.todo.push([ data, userContext, done ]);
+	this.engine.execute(this.dom.cloneNode(true), this.bindings, data, userContext, done);
+}
+
+
+/**
+ *
+ *
+ *
+ */
+function Engine(opts) {
+	opts = opts || { };
+	this.provider = opts.provider;
+	this.cache = { };
+	this.log = opts.log || console;
+	[ "debug", "info", "warn", "error" ].forEach(function(level) {
+		if (typeof this.log[level] === "undefined")
+			this.log[level] = this.log.log;
+	}, this)
+	
+}
+
+Engine.prototype.data = function(name, callback) {
+	var engine = this;
+
+	if (!this.provider)
+		throw new Error("No provider to fetch templates from!");
+	
+	this.log.debug("Fetching template "+name+"...");
+	var cachedTemplate = this.cache[name];
+		
+	if ( cachedTemplate )
+		this.provider.lastModified(name, function(time) {
+			cachedTemplate.outdated = !time || time > cachedTemplate.mtime;
+		});
+	
+	if ( cachedTemplate && !cachedTemplate.outdated ) {
+		this.log.debug("Using cached template.");
+		return callback(cachedTemplate.dom);
+	}
+
+	var p = new Engine.Parser(function(dom) {
+		engine.log.debug("Saving "+name+" to cache...");
+		engine.cache[name] = {
+			dom: dom,
+			mtime: Date.now(),
+			outdated: false
+		};
+		dom.documentElement.attributes["data-template"] = name;
+		callback(dom);
+	});
+	
+	engine.provider.get(name, function(e) {
+		engine.log.debug("Template "+name+" fetched.");
+		Engine.parse(e, callback)
+	});
+}
+
 
 /**
  *
@@ -466,6 +550,20 @@ Engine.Parser = function(callback) {
 		this.parser =  DOM.parser(callback);
 }
 
+Engine.parse = function(data, callback) {
+	var p = new Engine.Parser(callback);
+	if ((typeof EventEmitter !== "undefined") && (data instanceof EventEmitter)) {
+		data.pipe(p);
+	}
+	else if (data) {
+		p.data(data);
+		p.end();
+	}
+	else {
+		callback(undefined);
+	}
+}
+
 /**
  *
  *
@@ -500,16 +598,25 @@ Engine.prototype.template = function(name, bindings, data, context, done) {
 	var engine = this;
 
 	switch(arguments.length) {
-	case 2: //name, done
-		done = bindings;
-		bindings = { };
-		data = undefined;
+	case 1:
+		name = name;
 		break;
-	case 3: //name, bindings, done
-		done = data;
-		data = undefined;
+	case 2: //name, done OR name, bindings
+		if (typeof arguments[2] === "function") {
+			done = bindings;
+			bindings = { };
+		}	
 		break;
-	case 4:
+	case 3: //name, bindings, done OR name, bindings, context
+		data = undefined;
+		if (typeof arguments[2] === "function") {
+			done = arguments[2];
+		}
+		else {
+			context = arguments[2];
+		}
+		break;
+	case 4: //name, bindings, data, done
 		done = context;
 		context = undefined;
 		break;
@@ -525,63 +632,15 @@ Engine.prototype.template = function(name, bindings, data, context, done) {
 	if (typeof name === "string" && name.length === 0)
 		throw new Error("Template or its name must be greater than 0 characters in length.");
 
-	if (name[0] !== "<") {
-		if (!engine.provider)
-			throw new Error("No provider to fetch templates from!");
-		
-		engine.log.debug("Fetching template "+name+"...");
-		var cachedTemplate = this.cache[name];
-			
-		if ( cachedTemplate )
-			engine.provider.lastModified(name, function(time) {
-				cachedTemplate.outdated = !time || time > cachedTemplate.mtime;
-			});
-		
-		if ( cachedTemplate && !cachedTemplate.outdated ) {
-			engine.log.debug("Using cached template.");
-			return engine.execute(cachedTemplate.dom.cloneNode(true), bindings, data, context, done);
-		}
+	if (typeof name === "string")
+		name = name.trim();
 
-		var p = new Engine.Parser(function(dom) {
-			engine.log.debug("Saving "+name+" to cache...");
-			engine.cache[name] = {
-				dom: dom,
-				mtime: Date.now(),
-				outdated: false
-			};
-			dom.documentElement.attributes["data-template"] = name;
-			engine.log.debug("Rendering "+name+"...");
-			engine.execute(dom.cloneNode(true), bindings, data, context, done);
-		});
-		
-		engine.provider.get(name, function(e) {
-			engine.log.debug("Template "+name+" fetched.");
-			if ((typeof EventEmitter !== "undefined") && (e instanceof EventEmitter)) {
-				e.on( "data", function(chunk) {
-					p.data(chunk.toString());
-				}).on( "close",function() {
-					p.end();
-				});
-			}
-			else if (e) {
-				p.data(e);
-				p.end();
-			}
-			else {
-				throw new Error("Could not find template "+name);
-			}
-		});
-	}
-	else {
-		engine.log.debug("Rendering raw template data...");
-		var p = new Engine.Parser(function(dom) {
-			engine.execute(dom, bindings, data, context, done);
-		});
-		p.data(name);
-		p.end();
-	}
-	
-	return this;
+	var template = new Template(this, name, bindings, context);
+
+	if (done)
+		template.render(data, context, done);
+
+	return template;
 }
 
 /**

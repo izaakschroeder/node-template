@@ -665,7 +665,8 @@ Engine.prototype.context = function(doc) {
  *
  */
 Engine.prototype.template = function(name, bindings, data, context, done) {
-	return context.template.apply(this.context(), arguments);
+	var tmpContext = this.context();
+	return tmpContext.template.apply(tmpContext, arguments);
 }
 
 /**

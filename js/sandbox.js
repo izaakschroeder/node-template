@@ -14,7 +14,7 @@ $(function() {
 				data = eval("("+$("#TemplateInput *[name=data]").data("editor").getValue()+")");
 
 			engine.template(template, bindings, data, function(out) {			
-				output.html(out.documentElement);
+				output.html(out);
 			})
 		} catch(e) {
 			output.html("Error rendering.");

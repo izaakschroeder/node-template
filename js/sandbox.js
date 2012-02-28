@@ -92,6 +92,7 @@ $(function() {
 	$("#BenchmarkButton").bind("click", function() {
 		benchmark(localData(), function(results) {
 			console.log(results);
+			$("#Output").html("Ops/sec: "+Math.round(1000.0/results.avg));
 		})
 		return false;
 	});

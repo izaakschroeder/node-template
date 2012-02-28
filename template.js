@@ -4,8 +4,10 @@
 //TODO: Is there a better way of detecting this?
 var 
 	EventEmitter = typeof process === "object" ? require('events').EventEmitter : undefined, 
-	DOM = typeof window !== "undefined" ? window : require('dom'), 
+	DOM = typeof window !== "undefined" ? window : require('dom'),
+	implementation = typeof document !== "undefined" ? document.implementation : DOM.implementation,
 	Node = DOM.Node,
+	Element = DOM.Element,
 	Document = DOM.Document;
 
 
@@ -34,11 +36,12 @@ Stack.prototype.__defineGetter__("top", function() {
 	return this[this.length - 1];
 })
 
-function Template(engine, dom, bindings, context) {
+function Template(engine, doc, dom, bindings, context) {
 	this.engine = engine;
 	this.bindings = bindings;
 	this.todo = [ ];
 	this.dom = undefined;
+	this.document = doc;
 
 	var self = this;
 	//DOM is a document tree
@@ -64,9 +67,14 @@ function Template(engine, dom, bindings, context) {
 
 }
 
+Template.prototype.process = function(data, userContext, done) {
+	var root = this.document.importNode(this.dom.documentElement, true);
+	this.engine.execute(root, this.bindings, data, userContext, done);
+}
+
 Template.prototype.processTodo = function() {
 	for (var i = 0; i < this.todo.length; ++i)
-		this.engine.execute(this.dom.cloneNode(true), this.bindings, this.todo[i][0], this.todo[i][1], this.todo[i][2]);
+		this.process(this.todo[i][0], this.todo[i][1], this.todo[i][2]);
 }
 
 Template.prototype.render = function(data, userContext, done) {
@@ -76,9 +84,64 @@ Template.prototype.render = function(data, userContext, done) {
 	}
 	if (!this.dom)
 		return this.todo.push([ data, userContext, done ]);
-	this.engine.execute(this.dom.cloneNode(true), this.bindings, data, userContext, done);
+	this.process(data, userContext, done);
 }
 
+
+function Context(engine, doc) {
+	doc = doc || (typeof document !== "undefined" ? document : false) || implementation.createDocument("http://www.w3.org/1999/xhtml", "html", "html");
+	if (doc instanceof Document === false)
+		throw new TypeError("Document must be a valid DOM document!");
+	this.document = doc;
+	this.engine = engine;
+}
+
+Context.prototype.template = function(name, bindings, data, context, done) {
+	switch(arguments.length) {
+	case 1:
+		name = name;
+		break;
+	case 2: //name, done OR name, bindings
+		if (typeof arguments[1] === "function") {
+			done = bindings;
+			bindings = { };
+		}	
+		break;
+	case 3: //name, bindings, done OR name, bindings, context
+		data = undefined;
+		if (typeof arguments[2] === "function") {
+			done = arguments[2];
+		}
+		else {
+			context = arguments[2];
+		}
+		break;
+	case 4: //name, bindings, data, done
+		done = context;
+		context = undefined;
+		break;
+	case 5:
+		break;
+	default:
+		throw "Invalid number of arguments!";
+	}
+
+	if (typeof name !== "string" && name instanceof Document === false)
+		throw new TypeError("Template must be either a template string, a template name or a DOM tree.");
+	
+	if (typeof name === "string" && name.length === 0)
+		throw new Error("Template or its name must be greater than 0 characters in length.");
+
+	if (typeof name === "string")
+		name = name.trim();
+
+	var template = new Template(this.engine, this.document, name, bindings, context);
+
+	if (done)
+		template.render(data, context, done);
+
+	return template;
+}
 
 /**
  *
@@ -198,7 +261,7 @@ Engine.prototype.execute = function(dom, bindings, data, userContext, done) {
 	function content(element, content) {
 		empty(element);
 		if (!(content instanceof Node))
-			content = dom.createTextNode('' + content);
+			content = dom.ownerDocument.createTextNode('' + content);
 		element.appendChild(content);
 		return element;
 		
@@ -503,6 +566,9 @@ Engine.prototype.execute = function(dom, bindings, data, userContext, done) {
 
 	}
 	
+	if (dom instanceof Element === false && dom instanceof Document === false)
+		throw new TypeError("Must give an element or document!");
+
 	var stack = new Stack();
 	stack.push({ engine: engine, data: data, bindings: bindings })
 	transform(dom, stack, done);
@@ -589,58 +655,18 @@ Engine.Parser.prototype.end = function() {
 		
 }
 
+Engine.prototype.context = function(doc) {
+	return new Context(this, doc);
+}
+
 /**
  *
  *
  *
  */
 Engine.prototype.template = function(name, bindings, data, context, done) {
-	var engine = this;
-
-	switch(arguments.length) {
-	case 1:
-		name = name;
-		break;
-	case 2: //name, done OR name, bindings
-		if (typeof arguments[1] === "function") {
-			done = bindings;
-			bindings = { };
-		}	
-		break;
-	case 3: //name, bindings, done OR name, bindings, context
-		data = undefined;
-		if (typeof arguments[2] === "function") {
-			done = arguments[2];
-		}
-		else {
-			context = arguments[2];
-		}
-		break;
-	case 4: //name, bindings, data, done
-		done = context;
-		context = undefined;
-		break;
-	case 5:
-		break;
-	default:
-		throw "Invalid number of arguments!";
-	}
-
-	if (typeof name !== "string" && name instanceof Document === false)
-		throw new TypeError("Template must be either a template string, a template name or a DOM tree.");
-	
-	if (typeof name === "string" && name.length === 0)
-		throw new Error("Template or its name must be greater than 0 characters in length.");
-
-	if (typeof name === "string")
-		name = name.trim();
-
-	var template = new Template(this, name, bindings, context);
-
-	if (done)
-		template.render(data, context, done);
-
-	return template;
+	var context = this.context();
+	return context.template.apply(context, arguments);
 }
 
 /**

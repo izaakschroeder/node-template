@@ -56,14 +56,14 @@ function Template(engine, doc, dom, bindings, context) {
 		if (dom[0] === "<") {
 			//engine.log.debug("Rendering raw template data...");
 			Engine.parse(dom, function(dom) {
-				self.dom = dom;
+				self.dom = dom.documentElement;
 				self.processTodo();
 			});
 		}
 		//DOM is the name of a template
 		else {
 			engine.data(dom, function(dom) {
-				self.dom = dom;
+				self.dom = dom.documentElement;
 				self.processTodo();
 			})		
 		}
@@ -75,7 +75,7 @@ function Template(engine, doc, dom, bindings, context) {
 }
 
 Template.prototype.process = function(data, userContext, done) {
-	var root = this.document.importNode(this.dom || this.dom, true);
+	var root = this.document.importNode(this.dom, true);
 	this.engine.execute(root, this.bindings, data, userContext, done);
 }
 

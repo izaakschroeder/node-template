@@ -45,30 +45,37 @@ function Template(engine, doc, dom, bindings, context) {
 
 	var self = this;
 	//DOM is a document tree
-	if (dom instanceof Node) {
+	if (dom instanceof Document) {
+		this.dom = dom.documentElement;
+	}
+	else if (dom instanceof Element) {
 		this.dom = dom;
 	}
 	//DOM is actually raw XML so just parse it out
-	else if (dom[0] === "<") {
-		//engine.log.debug("Rendering raw template data...");
-		Engine.parse(dom, function(dom) {
-			self.dom = dom;
-			self.processTodo();
-		});
+	else if (typeof dom === "string") {
+		if (dom[0] === "<") {
+			//engine.log.debug("Rendering raw template data...");
+			Engine.parse(dom, function(dom) {
+				self.dom = dom;
+				self.processTodo();
+			});
+		}
+		//DOM is the name of a template
+		else {
+			engine.data(dom, function(dom) {
+				self.dom = dom;
+				self.processTodo();
+			})		
+		}
 	}
-	//DOM is the name of a template
 	else {
-		engine.data(dom, function(dom) {
-			self.dom = dom;
-			self.processTodo();
-		})		
+		throw new TypeError();
 	}
-
 
 }
 
 Template.prototype.process = function(data, userContext, done) {
-	var root = this.document.importNode(this.dom.documentElement, true);
+	var root = this.document.importNode(this.dom || this.dom, true);
 	this.engine.execute(root, this.bindings, data, userContext, done);
 }
 

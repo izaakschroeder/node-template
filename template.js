@@ -45,7 +45,7 @@ function Template(engine, doc, dom, bindings, context) {
 
 	var self = this;
 	//DOM is a document tree
-	if (dom instanceof Document) {
+	if (dom instanceof Node) {
 		this.dom = dom;
 	}
 	//DOM is actually raw XML so just parse it out
@@ -126,7 +126,7 @@ Context.prototype.template = function(name, bindings, data, context, done) {
 		throw "Invalid number of arguments!";
 	}
 
-	if (typeof name !== "string" && name instanceof Document === false)
+	if (typeof name !== "string" && name instanceof Document === false && name instanceof Element === false)
 		throw new TypeError("Template must be either a template string, a template name or a DOM tree.");
 	
 	if (typeof name === "string" && name.length === 0)
